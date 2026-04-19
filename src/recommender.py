@@ -18,6 +18,11 @@ class Song:
     valence: float
     danceability: float
     acousticness: float
+    popularity: int = 50
+    release_decade: int = 2020
+    instrumentalness: float = 0.5
+    lyrical_theme: str = ""
+    sub_mood: str = ""
 
 @dataclass
 class UserProfile:
@@ -46,21 +51,28 @@ class Recommender:
         # TODO: Implement explanation logic
         return "Explanation placeholder"
 
-FLOAT_FIELDS = {"energy", "valence", "danceability", "acousticness"}
-INT_FIELDS = {"id", "tempo_bpm"}
+FLOAT_FIELDS = {"energy", "valence", "danceability", "acousticness", "instrumentalness"}
+INT_FIELDS = {"id", "tempo_bpm", "popularity", "release_decade"}
 
 WEIGHTS = {
-    "genre": 0.25,
-    "mood": 0.20,
-    "energy": 0.18,
-    "acousticness": 0.13,
-    "danceability": 0.10,
-    "valence": 0.08,
-    "tempo": 0.06,
+    "genre": 0.20,
+    "mood": 0.14,
+    "energy": 0.12,
+    "acousticness": 0.09,
+    "danceability": 0.07,
+    "valence": 0.06,
+    "tempo": 0.04,
+    "popularity": 0.08,
+    "release_decade": 0.06,
+    "instrumentalness": 0.05,
+    "lyrical_theme": 0.05,
+    "sub_mood": 0.04,
 }
 
 TEMPO_MIN = 56
 TEMPO_MAX = 168
+POPULARITY_MAX = 100
+DECADE_OPTIONS = [1980, 1990, 2000, 2010, 2020]
 
 
 def load_songs(csv_path: str) -> List[Dict]:
@@ -135,6 +147,43 @@ def score_song(user_prefs: Dict, song: Dict) -> Tuple[float, List[str]]:
     tempo_pts = WEIGHTS["tempo"] * tempo_sim
     score += tempo_pts
     reasons.append(f"tempo proximity: {tempo_sim:.2f} (+{tempo_pts:.2f})")
+
+    # --- Popularity (numeric, proximity on 0-100 scale) ---
+    user_pop = user_prefs.get("popularity", 50)
+    pop_sim = 1.0 - abs(user_pop - song["popularity"]) / POPULARITY_MAX
+    pop_pts = WEIGHTS["popularity"] * pop_sim
+    score += pop_pts
+    reasons.append(f"popularity proximity: {pop_sim:.2f} (+{pop_pts:.2f})")
+
+    # --- Release Decade (era matching with distance penalty) ---
+    user_decade = user_prefs.get("release_decade", 2020)
+    decade_gap = abs(user_decade - song["release_decade"]) / 10
+    decade_sim = max(0.0, 1.0 - decade_gap * 0.25)
+    decade_pts = WEIGHTS["release_decade"] * decade_sim
+    score += decade_pts
+    reasons.append(f"decade {'match' if decade_gap == 0 else 'proximity'}: {song['release_decade']}s (+{decade_pts:.2f})")
+
+    # --- Instrumentalness (numeric, proximity) ---
+    inst_sim = 1.0 - abs(user_prefs.get("instrumentalness", 0.5) - song.get("instrumentalness", 0.5))
+    inst_pts = WEIGHTS["instrumentalness"] * inst_sim
+    score += inst_pts
+    reasons.append(f"instrumentalness proximity: {inst_sim:.2f} (+{inst_pts:.2f})")
+
+    # --- Lyrical Theme (categorical, binary match) ---
+    user_theme = user_prefs.get("lyrical_theme", "")
+    theme_sim = 1.0 if user_theme and song.get("lyrical_theme", "") == user_theme else 0.0
+    theme_pts = WEIGHTS["lyrical_theme"] * theme_sim
+    score += theme_pts
+    label = "match" if theme_sim == 1.0 else "mismatch"
+    reasons.append(f"lyrical theme {label}: {song.get('lyrical_theme', 'N/A')} (+{theme_pts:.2f})")
+
+    # --- Sub-Mood (categorical, binary bonus) ---
+    user_sub = user_prefs.get("sub_mood", "")
+    sub_sim = 1.0 if user_sub and song.get("sub_mood", "") == user_sub else 0.0
+    sub_pts = WEIGHTS["sub_mood"] * sub_sim
+    score += sub_pts
+    label = "match" if sub_sim == 1.0 else "mismatch"
+    reasons.append(f"sub-mood {label}: {song.get('sub_mood', 'N/A')} (+{sub_pts:.2f})")
 
     return (round(score, 4), reasons)
 

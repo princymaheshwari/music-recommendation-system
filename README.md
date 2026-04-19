@@ -29,15 +29,25 @@ Our recommender prioritizes **interpretability and precision over discovery**. R
 
 ### Song Features
 
-Each `Song` object carries seven features that the scoring rule uses:
+Each `Song` object carries twelve features that the scoring rule uses:
+
+**Original 7 features:**
 
 - **genre** — A categorical label (e.g., pop, lofi, rock, jazz, ambient, synthwave, indie pop). This is the broadest taste signal and the single most important feature in our scoring rule. A genre mismatch between user and song is the fastest way to produce a bad recommendation.
 - **mood** — A categorical label (e.g., happy, chill, intense, relaxed, moody, focused). Mood captures the emotional character of a song. Two songs can share a genre but feel completely different based on mood.
 - **energy** — A numeric value from 0 to 1 measuring intensity and activity. Low-energy songs (0.28) feel calm and ambient; high-energy songs (0.93) feel powerful and driving. Our system rewards proximity to the user's preferred energy level, not just high or low values.
-- **tempo_bpm** — Beats per minute, ranging from 60 to 152 in our catalog. Since this is on a different scale than the other numeric features, we normalize it to a 0–1 range before scoring. Tempo is correlated with energy but adds granularity — two chill songs can have noticeably different rhythmic feels.
-- **valence** — A numeric value from 0 to 1 measuring musical positivity or happiness. High-valence songs sound cheerful and upbeat; low-valence songs sound darker or more melancholic. This overlaps with mood but provides finer numeric resolution.
-- **danceability** — A numeric value from 0 to 1 measuring how suitable a song is for dancing based on rhythm, beat strength, and regularity. This helps separate party-ready tracks from introspective background music.
-- **acousticness** — A numeric value from 0 to 1 measuring how acoustic (organic instruments) versus electronic a song sounds. This feature cleanly splits the catalog: electronic pop tracks score around 0.05–0.22 while acoustic lofi and jazz tracks score 0.71–0.92.
+- **tempo_bpm** — Beats per minute, ranging from 56 to 168 in our catalog. Since this is on a different scale than the other numeric features, we normalize it to a 0–1 range before scoring.
+- **valence** — A numeric value from 0 to 1 measuring musical positivity or happiness. High-valence songs sound cheerful and upbeat; low-valence songs sound darker or more melancholic.
+- **danceability** — A numeric value from 0 to 1 measuring how suitable a song is for dancing based on rhythm, beat strength, and regularity.
+- **acousticness** — A numeric value from 0 to 1 measuring how acoustic (organic instruments) versus electronic a song sounds.
+
+**5 advanced features added:**
+
+- **popularity** — An integer from 0 to 100 representing how well-known the song is. Popular songs score 70+ while niche tracks score below 40. The system uses proximity scoring so a user who prefers underground music (popularity target of 30) will get different results from a mainstream listener (target of 80).
+- **release_decade** — The decade the song was released (e.g., 2000, 2010, 2020). Scoring uses a graduated distance penalty: matching the exact decade gives full credit, one decade away gives 75% credit, two decades gives 50%, and so on. This lets the system prioritize tracks from a user's preferred era while still surfacing songs from nearby decades.
+- **instrumentalness** — A numeric value from 0 to 1 measuring how instrumental (no vocals) versus vocal a song is. Lofi and ambient tracks score 0.70–0.97 while pop and R&B score 0.05–0.10. This separates users who want background music from those who want singalong tracks.
+- **lyrical_theme** — A categorical label describing the song's lyrical content (e.g., "love", "rebellion", "introspection", "empowerment", "loss", "storytelling"). Scored as a binary match. This adds a content dimension beyond pure audio features — two songs can sound similar but tell very different stories.
+- **sub_mood** — A more specific emotional tag than the primary mood (e.g., "euphoric", "contemplative", "aggressive", "melancholic", "peaceful", "sensual", "nostalgic", "dreamy"). Scored as a binary bonus. This provides finer emotional resolution within the broader mood categories.
 
 ### UserProfile Information
 
@@ -45,27 +55,37 @@ Each `UserProfile` stores the user's taste preferences that map directly to the 
 
 - **favorite_genre** — The genre the user prefers (e.g., "pop"). Compared as an exact match against each song's genre.
 - **favorite_mood** — The mood the user prefers (e.g., "happy"). Compared as an exact match against each song's mood.
-- **target_energy** — A numeric value (0–1) representing the user's preferred energy level. Scored using proximity — a song with energy close to this value scores higher than one far away.
-- **likes_acoustic** — A boolean indicating whether the user prefers acoustic-sounding music. If true, songs with high acousticness score well; if false, songs with low acousticness score well.
+- **target_energy** — A numeric value (0–1) representing the user's preferred energy level.
+- **likes_acoustic** — A boolean indicating whether the user prefers acoustic-sounding music.
 - **target_danceability** — A numeric preference (0–1) for how danceable the user wants their music.
 - **target_valence** — A numeric preference (0–1) for how musically positive or happy the user wants their music.
 - **target_tempo** — A normalized numeric preference (0–1) for preferred tempo.
+- **popularity** — An integer (0–100) indicating the user's preferred popularity level for songs.
+- **release_decade** — The decade the user prefers music from (e.g., 2020, 2010, 2000).
+- **instrumentalness** — A numeric preference (0–1) for how instrumental the user wants their music.
+- **lyrical_theme** — The lyrical content the user prefers (e.g., "love", "rebellion", "introspection").
+- **sub_mood** — The specific emotional tag the user prefers (e.g., "euphoric", "aggressive", "contemplative").
 
 ### How the Recommender Computes a Score
 
-The recommender uses a **weighted sum of feature-level similarities** to produce a single score (0.0 to 1.0) for each song. Each of the seven features has an assigned weight reflecting its importance, and a similarity function that measures how well the song matches the user on that dimension:
+The recommender uses a **weighted sum of feature-level similarities** to produce a single score (0.0 to 1.0) for each song. Each of the twelve features has an assigned weight reflecting its importance, and a similarity function that measures how well the song matches the user on that dimension:
 
 | Feature | Weight | Similarity Function |
 |---|---|---|
-| genre | 0.25 | 1.0 if exact match, 0.0 otherwise |
-| mood | 0.20 | 1.0 if exact match, 0.0 otherwise |
-| energy | 0.18 | 1 − \|user\_energy − song\_energy\| |
-| acousticness | 0.13 | song value if user likes acoustic, else 1 − song value |
-| danceability | 0.10 | 1 − \|user\_danceability − song\_danceability\| |
-| valence | 0.08 | 1 − \|user\_valence − song\_valence\| |
-| tempo | 0.06 | 1 − \|user\_norm\_tempo − song\_norm\_tempo\| |
+| genre | 0.20 | 1.0 if exact match, 0.0 otherwise |
+| mood | 0.14 | 1.0 if exact match, 0.0 otherwise |
+| energy | 0.12 | 1 − \|user\_energy − song\_energy\| |
+| acousticness | 0.09 | song value if user likes acoustic, else 1 − song value |
+| popularity | 0.08 | 1 − \|user\_pop − song\_pop\| / 100 |
+| danceability | 0.07 | 1 − \|user\_danceability − song\_danceability\| |
+| release\_decade | 0.06 | max(0, 1 − decade\_gap × 0.25) |
+| valence | 0.06 | 1 − \|user\_valence − song\_valence\| |
+| instrumentalness | 0.05 | 1 − \|user\_inst − song\_inst\| |
+| lyrical\_theme | 0.05 | 1.0 if exact match, 0.0 otherwise |
+| tempo | 0.04 | 1 − \|user\_norm\_tempo − song\_norm\_tempo\| |
+| sub\_mood | 0.04 | 1.0 if exact match, 0.0 otherwise |
 
-Genre is weighted highest because a genre mismatch is a dealbreaker — recommending rock to a jazz fan undermines trust regardless of how well the other features match. Mood is second because it determines whether a song fits the user's current emotional context. The numeric features (energy, acousticness, danceability, valence, tempo) are weighted in decreasing order of their independent discriminating power in our dataset.
+The weights were rebalanced when the 5 new features were added. Genre and mood remain the top two signals but their weights decreased from 0.25/0.20 to 0.20/0.14 to make room for the new dimensions. The original 7 features still account for 72% of the total score, while the 5 new features contribute the remaining 28%. This keeps the system's core behavior familiar while adding meaningful new differentiation — a song that matches the user's preferred era, lyrical theme, and sub-mood can now edge out one that only matches on the basic audio features.
 
 ### How Songs Are Chosen
 
@@ -128,16 +148,21 @@ flowchart TD
 The complete scoring formula for a single song is:
 
 ```
-score = 0.25 × genre_match
-      + 0.20 × mood_match
-      + 0.18 × (1 - |user_energy - song_energy|)
-      + 0.13 × acoustic_match
-      + 0.10 × (1 - |user_danceability - song_danceability|)
-      + 0.08 × (1 - |user_valence - song_valence|)
-      + 0.06 × (1 - |user_norm_tempo - song_norm_tempo|)
+score = 0.20 × genre_match
+      + 0.14 × mood_match
+      + 0.12 × (1 - |user_energy - song_energy|)
+      + 0.09 × acoustic_match
+      + 0.08 × (1 - |user_pop - song_pop| / 100)
+      + 0.07 × (1 - |user_danceability - song_danceability|)
+      + 0.06 × decade_similarity
+      + 0.06 × (1 - |user_valence - song_valence|)
+      + 0.05 × (1 - |user_inst - song_inst|)
+      + 0.05 × lyrical_theme_match
+      + 0.04 × (1 - |user_norm_tempo - song_norm_tempo|)
+      + 0.04 × sub_mood_match
 ```
 
-Where `genre_match` and `mood_match` are 1.0 for exact match or 0.0 otherwise, `acoustic_match` is the song's raw acousticness value if the user prefers acoustic music or `1 - acousticness` if they don't, and tempo is normalized to a 0–1 scale using `(bpm - 56) / (168 - 56)` based on the catalog's range. The ranking rule then sorts all scored songs descending and returns the top-k results with explanations.
+Where `genre_match`, `mood_match`, `lyrical_theme_match`, and `sub_mood_match` are 1.0 for exact match or 0.0 otherwise. `acoustic_match` is the song's raw acousticness value if the user prefers acoustic music or `1 - acousticness` if they don't. `decade_similarity` uses a graduated penalty: `max(0, 1 - decade_gap × 0.25)` where `decade_gap` is the number of decades apart. Tempo is normalized to a 0–1 scale using `(bpm - 56) / (168 - 56)`. The ranking rule then sorts all scored songs descending and returns the top-k results with explanations.
 
 ### CLI Output
 
