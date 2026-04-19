@@ -141,11 +141,27 @@ Where `genre_match` and `mood_match` are 1.0 for exact match or 0.0 otherwise, `
 
 ### CLI Output
 
-Terminal output showing the top-k recommendations for a pop/happy user profile, with scores and per-feature reason breakdowns:
+Terminal output showing the top-k recommendations for each user profile, with scores and per-feature reason breakdowns.
 
-![CLI output showing recommendations with scores and reasons](assets/cli_output.png)
-![](assets/cli_output2.png)
-![](assets/cli_output3.png)
+**Profile 1 — High-Energy Pop Fan**
+
+![High-Energy Pop Fan recommendations](assets/profile_pop.png)
+
+**Profile 2 — Chill Lofi Listener**
+
+![Chill Lofi Listener recommendations](assets/profile_lofi.png)
+
+**Profile 3 — Deep Intense Rock**
+
+![Deep Intense Rock recommendations](assets/profile_rock.png)
+
+**Profile 4 — Edge Case: Sad but High-Energy**
+
+![Sad but High-Energy recommendations](assets/profile_edge_sad_energy.png)
+
+**Profile 5 — Edge Case: Acoustic Electronic**
+
+![Acoustic Electronic recommendations](assets/profile_edge_acoustic_electronic.png)
 
 ### Expected Biases and Known Trade-Offs
 

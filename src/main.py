@@ -1,8 +1,6 @@
 """
 Command line runner for the Music Recommender Simulation.
 
-This file helps you quickly run and test your recommender.
-
 Functions are implemented in recommender.py:
 - load_songs
 - score_song
@@ -21,11 +19,66 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 SEPARATOR = "=" * 62
 THIN_SEP = "-" * 62
 
+# ---------------------------------------------------------------------------
+# User profiles
+# ---------------------------------------------------------------------------
 
-def display_profile(prefs: dict) -> None:
-    """Print the user taste profile in a readable format."""
-    print(SEPARATOR)
-    print("  USER TASTE PROFILE")
+PROFILES = {
+    "High-Energy Pop Fan": {
+        "genre": "pop",
+        "mood": "happy",
+        "energy": 0.8,
+        "likes_acoustic": False,
+        "danceability": 0.75,
+        "valence": 0.80,
+        "tempo": 0.55,
+    },
+    "Chill Lofi Listener": {
+        "genre": "lofi",
+        "mood": "chill",
+        "energy": 0.35,
+        "likes_acoustic": True,
+        "danceability": 0.55,
+        "valence": 0.58,
+        "tempo": 0.18,
+    },
+    "Deep Intense Rock": {
+        "genre": "rock",
+        "mood": "intense",
+        "energy": 0.92,
+        "likes_acoustic": False,
+        "danceability": 0.65,
+        "valence": 0.45,
+        "tempo": 0.85,
+    },
+    "EDGE CASE -- Sad but High-Energy": {
+        "genre": "r&b",
+        "mood": "sad",
+        "energy": 0.90,
+        "likes_acoustic": False,
+        "danceability": 0.80,
+        "valence": 0.30,
+        "tempo": 0.70,
+    },
+    "EDGE CASE -- Acoustic Electronic": {
+        "genre": "electronic",
+        "mood": "energetic",
+        "energy": 0.85,
+        "likes_acoustic": True,
+        "danceability": 0.90,
+        "valence": 0.75,
+        "tempo": 0.65,
+    },
+}
+
+# ---------------------------------------------------------------------------
+# Display helpers
+# ---------------------------------------------------------------------------
+
+def display_profile(name: str, prefs: dict) -> None:
+    """Print the user taste profile header."""
+    print(f"\n\n{SEPARATOR}")
+    print(f"  PROFILE: {name}")
     print(SEPARATOR)
     print(f"  Genre:        {prefs['genre']}")
     print(f"  Mood:         {prefs['mood']}")
@@ -37,9 +90,19 @@ def display_profile(prefs: dict) -> None:
     print(SEPARATOR)
 
 
-def display_recommendations(recommendations: list, k: int) -> None:
-    """Print the top-k recommendations in a clean terminal layout."""
-    print(f"\n  TOP {k} RECOMMENDATIONS")
+def display_quick_ranking(recommendations: list, k: int) -> None:
+    """Print a compact ranked list showing only title, artist, and score."""
+    print(f"\n  TOP {k} AT A GLANCE")
+    print(THIN_SEP)
+    for rank, (song, score, _) in enumerate(recommendations, start=1):
+        bar = "#" * int(score * 30)
+        print(f"  #{rank}  {song['title']:.<30s} {score:.4f}  {bar}")
+    print(THIN_SEP)
+
+
+def display_detailed(recommendations: list) -> None:
+    """Print the full per-feature breakdown for every recommended song."""
+    print(f"\n  DETAILED BREAKDOWN")
     print(SEPARATOR)
 
     for rank, (song, score, explanation) in enumerate(recommendations, start=1):
@@ -55,23 +118,20 @@ def display_recommendations(recommendations: list, k: int) -> None:
     print(f"\n{SEPARATOR}")
 
 
+# ---------------------------------------------------------------------------
+# Main
+# ---------------------------------------------------------------------------
+
 def main() -> None:
+    """Run the recommender for every profile and display results."""
     songs = load_songs(str(PROJECT_ROOT / "data" / "songs.csv"))
-
-    user_prefs = {
-        "genre": "pop",
-        "mood": "happy",
-        "energy": 0.8,
-        "likes_acoustic": False,
-        "danceability": 0.75,
-        "valence": 0.80,
-        "tempo": 0.55,
-    }
-
     k = 5
-    display_profile(user_prefs)
-    recommendations = recommend_songs(user_prefs, songs, k=k)
-    display_recommendations(recommendations, k)
+
+    for name, prefs in PROFILES.items():
+        display_profile(name, prefs)
+        recs = recommend_songs(prefs, songs, k=k)
+        display_quick_ranking(recs, k)
+        display_detailed(recs)
 
 
 if __name__ == "__main__":
