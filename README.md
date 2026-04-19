@@ -87,6 +87,19 @@ The recommender uses a **weighted sum of feature-level similarities** to produce
 
 The weights were rebalanced when the 5 new features were added. Genre and mood remain the top two signals but their weights decreased from 0.25/0.20 to 0.20/0.14 to make room for the new dimensions. The original 7 features still account for 72% of the total score, while the 5 new features contribute the remaining 28%. This keeps the system's core behavior familiar while adding meaningful new differentiation — a song that matches the user's preferred era, lyrical theme, and sub-mood can now edge out one that only matches on the basic audio features.
 
+### Scoring Modes (Strategy Pattern)
+
+The system supports **four interchangeable scoring strategies** using the Strategy design pattern. The scoring algorithm itself is identical across all modes — only the weight distribution changes. Each strategy is stored as a named dictionary in `SCORING_STRATEGIES`, and the strategy name is passed through `score_song()` and `recommend_songs()` as a string parameter. This keeps the code modular: adding a new mode requires only a new weight dictionary, with zero changes to the scoring logic.
+
+| Strategy | Philosophy | Top 3 Weights |
+|---|---|---|
+| **balanced** | Equal consideration of all dimensions | genre 0.20, mood 0.14, energy 0.12 |
+| **genre-first** | Genre match is the dealbreaker; everything else is secondary | genre 0.40, mood 0.10, popularity 0.08 |
+| **mood-first** | Emotional fit matters most; genre is downplayed | mood 0.30, sub\_mood 0.12, lyrical\_theme 0.10 |
+| **energy-focused** | Physical feel of the music dominates scoring | energy 0.25, danceability 0.15, acousticness & tempo 0.12 each |
+
+**Why this matters:** The same user profile produces different rankings under different strategies. For example, the "High-Energy Pop Fan" profile under `genre-first` pushes Gym Hero to #2 (it matches pop) while `mood-first` drops it to #5 (its "intense" mood mismatches "happy"). This demonstrates that the weight design is just as important as the features themselves, and gives users the ability to tune the recommender to their context — discovering new genres (mood-first) vs. staying in their comfort zone (genre-first).
+
 ### How Songs Are Chosen
 
 The **ranking rule** orchestrates the scoring rule into a final recommendation list. It scores every song in the catalog against the user profile, sorts the results from highest to lowest score, and returns the top-k songs. This two-step design — score individually, then rank collectively — keeps the scoring logic reusable and testable in isolation while allowing the ranking step to handle list-level concerns like sorting, selection, and potential diversity enforcement.

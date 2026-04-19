@@ -12,7 +12,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from recommender import load_songs, recommend_songs
+from recommender import load_songs, recommend_songs, SCORING_STRATEGIES
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
@@ -120,9 +120,10 @@ def display_profile(name: str, prefs: dict) -> None:
     print(SEPARATOR)
 
 
-def display_quick_ranking(recommendations: list, k: int) -> None:
+def display_quick_ranking(recommendations: list, k: int, strategy: str = "") -> None:
     """Print a compact ranked list showing only title, artist, and score."""
-    print(f"\n  TOP {k} AT A GLANCE")
+    header = f"TOP {k} — Strategy: {strategy.upper()}" if strategy else f"TOP {k} AT A GLANCE"
+    print(f"\n  {header}")
     print(THIN_SEP)
     for rank, (song, score, _) in enumerate(recommendations, start=1):
         bar = "#" * int(score * 30)
@@ -130,9 +131,10 @@ def display_quick_ranking(recommendations: list, k: int) -> None:
     print(THIN_SEP)
 
 
-def display_detailed(recommendations: list) -> None:
+def display_detailed(recommendations: list, strategy: str = "") -> None:
     """Print the full per-feature breakdown for every recommended song."""
-    print(f"\n  DETAILED BREAKDOWN")
+    header = f"DETAILED BREAKDOWN — {strategy.upper()}" if strategy else "DETAILED BREAKDOWN"
+    print(f"\n  {header}")
     print(SEPARATOR)
 
     for rank, (song, score, explanation) in enumerate(recommendations, start=1):
@@ -153,15 +155,17 @@ def display_detailed(recommendations: list) -> None:
 # ---------------------------------------------------------------------------
 
 def main() -> None:
-    """Run the recommender for every profile and display results."""
+    """Run every profile through every scoring strategy and display results."""
     songs = load_songs(str(PROJECT_ROOT / "data" / "songs.csv"))
     k = 5
+    strategies = list(SCORING_STRATEGIES.keys())
 
     for name, prefs in PROFILES.items():
         display_profile(name, prefs)
-        recs = recommend_songs(prefs, songs, k=k)
-        display_quick_ranking(recs, k)
-        display_detailed(recs)
+        for strat in strategies:
+            recs = recommend_songs(prefs, songs, k=k, strategy=strat)
+            display_quick_ranking(recs, k, strategy=strat)
+            display_detailed(recs, strategy=strat)
 
 
 if __name__ == "__main__":
