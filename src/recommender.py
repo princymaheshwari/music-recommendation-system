@@ -64,10 +64,7 @@ TEMPO_MAX = 168
 
 
 def load_songs(csv_path: str) -> List[Dict]:
-    """
-    Loads songs from a CSV file.
-    Required by src/main.py
-    """
+    """Parse songs.csv into a list of dicts with numeric fields converted to int/float."""
     songs = []
     with open(csv_path, newline="", encoding="utf-8") as f:
         reader = csv.DictReader(f)
@@ -86,10 +83,7 @@ def _normalize_tempo(bpm: float) -> float:
 
 
 def score_song(user_prefs: Dict, song: Dict) -> Tuple[float, List[str]]:
-    """
-    Scores a single song against user preferences.
-    Required by recommend_songs() and src/main.py
-    """
+    """Return a (score, reasons) tuple measuring how well a song matches user preferences."""
     score = 0.0
     reasons: List[str] = []
 
@@ -145,10 +139,7 @@ def score_song(user_prefs: Dict, song: Dict) -> Tuple[float, List[str]]:
     return (round(score, 4), reasons)
 
 def recommend_songs(user_prefs: Dict, songs: List[Dict], k: int = 5) -> List[Tuple[Dict, float, str]]:
-    """
-    Functional implementation of the recommendation logic.
-    Required by src/main.py
-    """
+    """Score all songs, sort descending, and return the top-k with explanations."""
     scored = [
         (song, *score_song(user_prefs, song))
         for song in songs
