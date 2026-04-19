@@ -139,6 +139,14 @@ score = 0.25 × genre_match
 
 Where `genre_match` and `mood_match` are 1.0 for exact match or 0.0 otherwise, `acoustic_match` is the song's raw acousticness value if the user prefers acoustic music or `1 - acousticness` if they don't, and tempo is normalized to a 0–1 scale using `(bpm - 56) / (168 - 56)` based on the catalog's range. The ranking rule then sorts all scored songs descending and returns the top-k results with explanations.
 
+### CLI Output
+
+Terminal output showing the top-k recommendations for a pop/happy user profile, with scores and per-feature reason breakdowns:
+
+![CLI output showing recommendations with scores and reasons](assets/cli_output.png)
+![](assets/cli_output2.png)
+![](assets/cli_output3.png)
+
 ### Expected Biases and Known Trade-Offs
 
 This system has several biases that are important to acknowledge upfront:
