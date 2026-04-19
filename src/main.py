@@ -7,17 +7,21 @@ Functions are implemented in recommender.py:
 - recommend_songs
 """
 
+import io
+import re
 import sys
 from pathlib import Path
 
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+from tabulate import tabulate
 from recommender import load_songs, recommend_songs, SCORING_STRATEGIES
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
-SEPARATOR = "=" * 62
-THIN_SEP = "-" * 62
+SEPARATOR = "=" * 78
+THIN_SEP = "-" * 78
 
 # ---------------------------------------------------------------------------
 # User profiles
@@ -97,58 +101,123 @@ PROFILES = {
 }
 
 # ---------------------------------------------------------------------------
-# Display helpers
+# Helpers
+# ---------------------------------------------------------------------------
+
+_REASON_RE = re.compile(r"^(.+?):\s*.+?\s*\(\+(\d+\.\d+)\)$")
+_DIVERSITY_RE = re.compile(r"^DIVERSITY:\s*(.+)$")
+
+
+def _bar(score: float, width: int = 20) -> str:
+    """Render a proportional Unicode bar for a 0-1 score."""
+    filled = int(score * width)
+    return "\u2588" * filled + "\u2591" * (width - filled)
+
+
+def _top_reasons(explanation: str, n: int = 3) -> str:
+    """Extract the n highest-scoring reason labels from an explanation string."""
+    parts = explanation.split("; ")
+    scored = []
+    diversity_note = ""
+    for part in parts:
+        dm = _DIVERSITY_RE.match(part)
+        if dm:
+            diversity_note = f" [DIV: {dm.group(1)}]"
+            continue
+        m = _REASON_RE.match(part)
+        if m:
+            scored.append((m.group(1).strip(), float(m.group(2))))
+
+    scored.sort(key=lambda x: x[1], reverse=True)
+    top = [f"{lbl} (+{pts:.2f})" for lbl, pts in scored[:n]]
+    return "; ".join(top) + diversity_note
+
+
+# ---------------------------------------------------------------------------
+# Display functions
 # ---------------------------------------------------------------------------
 
 def display_profile(name: str, prefs: dict) -> None:
-    """Print the user taste profile header."""
+    """Print the user taste profile as a two-column table."""
     print(f"\n\n{SEPARATOR}")
     print(f"  PROFILE: {name}")
     print(SEPARATOR)
-    print(f"  Genre:            {prefs['genre']}")
-    print(f"  Mood:             {prefs['mood']}")
-    print(f"  Energy:           {prefs['energy']}")
-    print(f"  Acoustic:         {'Yes' if prefs.get('likes_acoustic') else 'No'}")
-    print(f"  Danceability:     {prefs.get('danceability', 'N/A')}")
-    print(f"  Valence:          {prefs.get('valence', 'N/A')}")
-    print(f"  Tempo (norm):     {prefs.get('tempo', 'N/A')}")
-    print(f"  Popularity:       {prefs.get('popularity', 'N/A')}")
-    print(f"  Decade:           {prefs.get('release_decade', 'N/A')}s")
-    print(f"  Instrumentalness: {prefs.get('instrumentalness', 'N/A')}")
-    print(f"  Lyrical Theme:    {prefs.get('lyrical_theme', 'N/A')}")
-    print(f"  Sub-Mood:         {prefs.get('sub_mood', 'N/A')}")
-    print(SEPARATOR)
+    rows = [
+        ["Genre", prefs["genre"]],
+        ["Mood", prefs["mood"]],
+        ["Energy", prefs["energy"]],
+        ["Acoustic", "Yes" if prefs.get("likes_acoustic") else "No"],
+        ["Danceability", prefs.get("danceability", "N/A")],
+        ["Valence", prefs.get("valence", "N/A")],
+        ["Tempo (norm)", prefs.get("tempo", "N/A")],
+        ["Popularity", prefs.get("popularity", "N/A")],
+        ["Decade", f"{prefs.get('release_decade', 'N/A')}s"],
+        ["Instrumentalness", prefs.get("instrumentalness", "N/A")],
+        ["Lyrical Theme", prefs.get("lyrical_theme", "N/A")],
+        ["Sub-Mood", prefs.get("sub_mood", "N/A")],
+    ]
+    print(tabulate(rows, headers=["Preference", "Value"], tablefmt="simple_outline"))
 
 
-def display_quick_ranking(recommendations: list, k: int, strategy: str = "") -> None:
-    """Print a compact ranked list showing only title, artist, and score."""
-    header = f"TOP {k} — Strategy: {strategy.upper()}" if strategy else f"TOP {k} AT A GLANCE"
+def display_summary_table(recommendations: list, k: int, strategy: str = "") -> None:
+    """Print a tabulate-formatted summary table with scores and top reasons."""
+    header = f"TOP {k} — Strategy: {strategy.upper()}" if strategy else f"TOP {k}"
     print(f"\n  {header}")
-    print(THIN_SEP)
-    for rank, (song, score, _) in enumerate(recommendations, start=1):
-        bar = "#" * int(score * 30)
-        print(f"  #{rank}  {song['title']:.<30s} {score:.4f}  {bar}")
-    print(THIN_SEP)
+
+    rows = []
+    for rank, (song, score, explanation) in enumerate(recommendations, start=1):
+        rows.append([
+            f"#{rank}",
+            song["title"],
+            song["artist"],
+            song["genre"],
+            f"{score:.4f}",
+            _bar(score),
+            _top_reasons(explanation),
+        ])
+
+    print(tabulate(
+        rows,
+        headers=["Rank", "Title", "Artist", "Genre", "Score", "Bar", "Top Reasons"],
+        tablefmt="simple_grid",
+        stralign="left",
+    ))
 
 
 def display_detailed(recommendations: list, strategy: str = "") -> None:
-    """Print the full per-feature breakdown for every recommended song."""
-    header = f"DETAILED BREAKDOWN — {strategy.upper()}" if strategy else "DETAILED BREAKDOWN"
+    """Print a per-song feature breakdown table for every recommended song."""
+    header = f"FEATURE BREAKDOWN — {strategy.upper()}" if strategy else "FEATURE BREAKDOWN"
     print(f"\n  {header}")
     print(SEPARATOR)
 
     for rank, (song, score, explanation) in enumerate(recommendations, start=1):
-        print(f"\n  #{rank}  {song['title']}  by  {song['artist']}")
-        print(f"       Genre: {song['genre']}  |  Mood: {song['mood']}")
-        print(f"       Score: {score:.4f}")
-        print(f"       {THIN_SEP}")
+        print(f"\n  #{rank}  {song['title']}  by  {song['artist']}  "
+              f"({song['genre']} / {song['mood']})  —  Score: {score:.4f}")
 
-        reasons = explanation.split("; ")
-        for reason in reasons:
-            if reason.startswith("DIVERSITY:"):
-                print(f"       >>> {reason}")
+        parts = explanation.split("; ")
+        feature_rows = []
+        diversity_row = None
+        for part in parts:
+            dm = _DIVERSITY_RE.match(part)
+            if dm:
+                diversity_row = dm.group(1)
+                continue
+            m = _REASON_RE.match(part)
+            if m:
+                label = m.group(1)
+                pts = float(m.group(2))
+                feature_rows.append([label, f"+{pts:.2f}", _bar(pts, 12)])
             else:
-                print(f"         {reason}")
+                feature_rows.append([part, "", ""])
+
+        print(tabulate(
+            feature_rows,
+            headers=["Feature", "Points", ""],
+            tablefmt="simple_outline",
+            stralign="left",
+        ))
+        if diversity_row:
+            print(f"       >>> DIVERSITY: {diversity_row}")
 
     print(f"\n{SEPARATOR}")
 
@@ -167,7 +236,7 @@ def main() -> None:
         display_profile(name, prefs)
         for strat in strategies:
             recs = recommend_songs(prefs, songs, k=k, strategy=strat)
-            display_quick_ranking(recs, k, strategy=strat)
+            display_summary_table(recs, k, strategy=strat)
             display_detailed(recs, strategy=strat)
 
 
