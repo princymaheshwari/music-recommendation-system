@@ -11,7 +11,7 @@ Your goal is to:
 - Evaluate what your system gets right and wrong
 - Reflect on how this mirrors real world AI recommenders
 
-This project is a content-based music recommender that scores songs against a user's taste profile using seven weighted features. It does not rely on other users' behavior (collaborative filtering) — instead, it analyzes the attributes of each song and measures how closely they match what a user prefers. The system loads a small catalog of 10 songs, evaluates each one with a math-based scoring rule, ranks them, and presents the top recommendations with human-readable explanations of why each song was chosen.
+This project is a content-based music recommender that scores songs against a user's taste profile using seven weighted features. It does not rely on other users' behavior (collaborative filtering) — instead, it analyzes the attributes of each song and measures how closely they match what a user prefers. The system loads a catalog of 20 songs, evaluates each one with a math-based scoring rule, ranks them, and presents the top recommendations with human-readable explanations of why each song was chosen.
 
 ---
 
@@ -70,6 +70,58 @@ Genre is weighted highest because a genre mismatch is a dealbreaker — recommen
 ### How Songs Are Chosen
 
 The **ranking rule** orchestrates the scoring rule into a final recommendation list. It scores every song in the catalog against the user profile, sorts the results from highest to lowest score, and returns the top-k songs (default k=5). This two-step design — score individually, then rank collectively — keeps the scoring logic reusable and testable in isolation while allowing the ranking step to handle list-level concerns like sorting, selection, and potential diversity enforcement.
+
+### Data Flow Diagram
+
+The following diagram traces how a single song travels from the CSV file through scoring to a ranked recommendation list.
+
+```mermaid
+flowchart TD
+    subgraph input [INPUT]
+        CSV["songs.csv\n20 songs with 7 features each"]
+        UserPrefs["User Preferences\ngenre, mood, energy,\nacousticness, danceability,\nvalence, tempo"]
+    end
+
+    LoadSongs["load_songs()\nParse CSV into list of\nsong dictionaries"]
+
+    CSV --> LoadSongs
+
+    subgraph theLoop [THE LOOP: Score Every Song]
+        direction TB
+        PickSong["Pick next song\nfrom catalog"]
+        subgraph scoringRule [score_song: Weighted Similarity]
+            direction TB
+            CatMatch["Categorical Match\ngenre: 1.0 or 0.0\nmood: 1.0 or 0.0"]
+            NumProx["Numeric Proximity\nenergy: 1 - |diff|\ndanceability: 1 - |diff|\nvalence: 1 - |diff|\ntempo: 1 - |norm_diff|"]
+            AcousticDir["Acoustic Direction\nlikes_acoustic? use raw value\nelse use 1 - value"]
+            WeightedSum["Weighted Sum\n0.25g + 0.20m + 0.18e\n+ 0.13a + 0.10d + 0.08v + 0.06t"]
+            CatMatch --> WeightedSum
+            NumProx --> WeightedSum
+            AcousticDir --> WeightedSum
+        end
+        ScoreOut["Output: score + reasons\nfor this one song"]
+        PickSong --> scoringRule
+        WeightedSum --> ScoreOut
+        ScoreOut -->|"More songs?\nYes"| PickSong
+    end
+
+    LoadSongs --> theLoop
+    UserPrefs --> theLoop
+
+    subgraph output [OUTPUT: Ranking Rule]
+        direction TB
+        AllScores["Collect all 20\nscore + reason pairs"]
+        SortDesc["Sort by score\nhighest to lowest"]
+        TopK["Select top-k\ndefault k = 5"]
+        Explain["Attach explanation\nto each recommendation"]
+        FinalList["Final Output\nTop 5 songs with\nscores and reasons"]
+        AllScores --> SortDesc --> TopK --> Explain --> FinalList
+    end
+
+    ScoreOut -->|"More songs?\nNo"| AllScores
+```
+
+**Reading the diagram:** Data flows top to bottom through three stages. The INPUT stage loads the song catalog and accepts user preferences. THE LOOP stage is where the scoring rule runs — it picks each song one at a time, computes similarity across all seven features, combines them into a weighted sum, and produces a score with reasons. Once every song has been scored, the OUTPUT stage collects all scores, sorts them from best to worst, slices the top-k, and attaches human-readable explanations to produce the final recommendation list.
 
 ---
 
