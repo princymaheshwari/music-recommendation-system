@@ -75,16 +75,27 @@ Prompts:
 
 ## 7. Evaluation  
 
-How you checked whether the recommender behaved as expected. 
+Five user profiles were tested to evaluate the recommender across normal and adversarial conditions.
 
-Prompts:  
+**Profiles tested:**
 
-- Which user profiles you tested  
-- What you looked for in the recommendations  
-- What surprised you  
-- Any simple tests or comparisons you ran  
+| Profile | Genre | Mood | Energy | Acoustic | Purpose |
+|---|---|---|---|---|---|
+| High-Energy Pop Fan | pop | happy | 0.8 | No | Baseline — clear preferences, multiple catalog matches |
+| Chill Lofi Listener | lofi | chill | 0.35 | Yes | Opposite end of the energy spectrum |
+| Deep Intense Rock | rock | intense | 0.92 | No | Single-song genre, high-energy dark preferences |
+| Sad but High-Energy | r&b | sad | 0.90 | No | Adversarial — contradictory mood and energy |
+| Acoustic Electronic | electronic | energetic | 0.85 | Yes | Adversarial — acoustic preference clashes with electronic genre |
 
-No need for numeric metrics unless you created some.
+**What I looked for:** For each profile, I checked whether the top-ranked songs made intuitive sense — does a pop fan get pop songs first? Does a lofi listener get ambient or jazz tracks as fallbacks instead of metal? I also checked whether the reason breakdowns correctly showed which features drove each score up or down.
+
+**What matched expectations:** The three normal profiles worked almost perfectly. The Pop Fan got Sunrise City at 0.97, the Lofi Listener got Library Rain at 0.98, and the Rock profile got Storm Runner at 0.98. In each case, the top pick was the song with both a genre and mood match plus strong numeric alignment. The fallback songs also made sense — the Pop Fan's second pick was Gym Hero (same genre, different mood), and the Lofi Listener's fourth pick was Spacewalk Thoughts (different genre but matching chill mood and high acousticness).
+
+**What surprised me:** "Gym Hero" kept appearing in the top 5 for profiles that had nothing to do with intense workout music. It showed up at #2 for the Pop Fan (who wanted happy, not intense) and at #5 for the Sad but High-Energy edge case (who wanted R&B, not pop). The reason is that Gym Hero has very high energy (0.93), very low acousticness (0.05), and high danceability (0.88) — so it scores well on the numeric features for any user who wants loud, electronic-leaning, danceable music, even if the genre and mood are wrong. In plain language: Gym Hero is a "numeric chameleon" — its numbers are so extreme that they partially compensate for categorical mismatches. This is like a streaming app recommending a workout playlist song to someone browsing sad ballads just because the underlying audio features happen to overlap.
+
+**The edge cases revealed real weaknesses:** The "Sad but High-Energy" user's top pick scored only 0.77 — the lowest top-pick score of any profile. That is because sad songs in the catalog tend to have low energy (Echoes of You has 0.38, Autumn Letters has 0.22), so the energy proximity feature punished every song that matched the mood. The system cannot understand that the user's request is unusual — it just measures distances feature by feature. The "Acoustic Electronic" profile exposed a different problem: Neon Pulse won at 0.85 despite getting +0.00 for acousticness. The genre and mood match (contributing +0.45 together) completely overrode the acoustic preference. This means the system would recommend the least acoustic song in the catalog to someone who explicitly asked for acoustic music, just because the genre label matched.
+
+**Tests run:** Automated pytest tests confirmed that the Recommender class returns the correct number of songs and that a pop/happy profile ranks pop songs above lofi songs. Manual inspection of all 20 song scores for the Pop Fan profile confirmed scores decreased monotonically from genre+mood matches down to songs with zero categorical overlap.
 
 ---
 
