@@ -11,23 +11,65 @@ Your goal is to:
 - Evaluate what your system gets right and wrong
 - Reflect on how this mirrors real world AI recommenders
 
-Replace this paragraph with your own summary of what your version does.
+This project is a content-based music recommender that scores songs against a user's taste profile using seven weighted features. It does not rely on other users' behavior (collaborative filtering) — instead, it analyzes the attributes of each song and measures how closely they match what a user prefers. The system loads a small catalog of 10 songs, evaluates each one with a math-based scoring rule, ranks them, and presents the top recommendations with human-readable explanations of why each song was chosen.
 
 ---
 
 ## How The System Works
 
-Explain your design in plain language.
+### How Real-World Recommendations Work
 
-Some prompts to answer:
+Real-world platforms like Spotify and YouTube use two major approaches to predict what users will enjoy. **Collaborative filtering** looks at the behavior of millions of users — if people with similar listening histories tend to love a certain track, the system assumes you will too. It treats songs as opaque IDs and relies entirely on crowd patterns, which makes it powerful at surfacing surprising discoveries but vulnerable to the cold-start problem (new songs and new users have no behavioral data yet). **Content-based filtering** takes the opposite approach: it analyzes the attributes of the music itself — things like genre, tempo, energy, and mood — and builds a taste profile from what you've already listened to. It can recommend brand-new songs the moment they're released, as long as their audio features are known, but it risks creating a "filter bubble" of overly similar recommendations.
 
-- What features does each `Song` use in your system
-  - For example: genre, mood, energy, tempo
-- What information does your `UserProfile` store
-- How does your `Recommender` compute a score for each song
-- How do you choose which songs to recommend
+Real platforms combine both approaches into hybrid systems and layer on deep learning, natural language processing (scanning blogs and reviews for cultural context), and contextual signals like time of day or device type. Our simulation focuses purely on the content-based side, which is the most transparent and explainable approach — every recommendation can be traced back to specific feature matches.
 
-You can include a simple diagram or bullet list if helpful.
+### What Our Version Prioritizes
+
+Our recommender prioritizes **interpretability and precision over discovery**. Rather than trying to surprise the user with unexpected picks, it focuses on finding songs that closely match a stated taste profile across multiple dimensions. Every score is a weighted sum of feature-level similarities, and every recommendation comes with a plain-language explanation of why it was chosen. This makes the system easy to understand, easy to debug, and easy to evaluate — qualities that matter in a learning context where the goal is to understand how recommenders think.
+
+### Song Features
+
+Each `Song` object carries seven features that the scoring rule uses:
+
+- **genre** — A categorical label (e.g., pop, lofi, rock, jazz, ambient, synthwave, indie pop). This is the broadest taste signal and the single most important feature in our scoring rule. A genre mismatch between user and song is the fastest way to produce a bad recommendation.
+- **mood** — A categorical label (e.g., happy, chill, intense, relaxed, moody, focused). Mood captures the emotional character of a song. Two songs can share a genre but feel completely different based on mood.
+- **energy** — A numeric value from 0 to 1 measuring intensity and activity. Low-energy songs (0.28) feel calm and ambient; high-energy songs (0.93) feel powerful and driving. Our system rewards proximity to the user's preferred energy level, not just high or low values.
+- **tempo_bpm** — Beats per minute, ranging from 60 to 152 in our catalog. Since this is on a different scale than the other numeric features, we normalize it to a 0–1 range before scoring. Tempo is correlated with energy but adds granularity — two chill songs can have noticeably different rhythmic feels.
+- **valence** — A numeric value from 0 to 1 measuring musical positivity or happiness. High-valence songs sound cheerful and upbeat; low-valence songs sound darker or more melancholic. This overlaps with mood but provides finer numeric resolution.
+- **danceability** — A numeric value from 0 to 1 measuring how suitable a song is for dancing based on rhythm, beat strength, and regularity. This helps separate party-ready tracks from introspective background music.
+- **acousticness** — A numeric value from 0 to 1 measuring how acoustic (organic instruments) versus electronic a song sounds. This feature cleanly splits the catalog: electronic pop tracks score around 0.05–0.22 while acoustic lofi and jazz tracks score 0.71–0.92.
+
+### UserProfile Information
+
+Each `UserProfile` stores the user's taste preferences that map directly to the song features:
+
+- **favorite_genre** — The genre the user prefers (e.g., "pop"). Compared as an exact match against each song's genre.
+- **favorite_mood** — The mood the user prefers (e.g., "happy"). Compared as an exact match against each song's mood.
+- **target_energy** — A numeric value (0–1) representing the user's preferred energy level. Scored using proximity — a song with energy close to this value scores higher than one far away.
+- **likes_acoustic** — A boolean indicating whether the user prefers acoustic-sounding music. If true, songs with high acousticness score well; if false, songs with low acousticness score well.
+- **target_danceability** — A numeric preference (0–1) for how danceable the user wants their music.
+- **target_valence** — A numeric preference (0–1) for how musically positive or happy the user wants their music.
+- **target_tempo** — A normalized numeric preference (0–1) for preferred tempo.
+
+### How the Recommender Computes a Score
+
+The recommender uses a **weighted sum of feature-level similarities** to produce a single score (0.0 to 1.0) for each song. Each of the seven features has an assigned weight reflecting its importance, and a similarity function that measures how well the song matches the user on that dimension:
+
+| Feature | Weight | Similarity Function |
+|---|---|---|
+| genre | 0.25 | 1.0 if exact match, 0.0 otherwise |
+| mood | 0.20 | 1.0 if exact match, 0.0 otherwise |
+| energy | 0.18 | 1 − \|user\_energy − song\_energy\| |
+| acousticness | 0.13 | song value if user likes acoustic, else 1 − song value |
+| danceability | 0.10 | 1 − \|user\_danceability − song\_danceability\| |
+| valence | 0.08 | 1 − \|user\_valence − song\_valence\| |
+| tempo | 0.06 | 1 − \|user\_norm\_tempo − song\_norm\_tempo\| |
+
+Genre is weighted highest because a genre mismatch is a dealbreaker — recommending rock to a jazz fan undermines trust regardless of how well the other features match. Mood is second because it determines whether a song fits the user's current emotional context. The numeric features (energy, acousticness, danceability, valence, tempo) are weighted in decreasing order of their independent discriminating power in our dataset.
+
+### How Songs Are Chosen
+
+The **ranking rule** orchestrates the scoring rule into a final recommendation list. It scores every song in the catalog against the user profile, sorts the results from highest to lowest score, and returns the top-k songs (default k=5). This two-step design — score individually, then rank collectively — keeps the scoring logic reusable and testable in isolation while allowing the ranking step to handle list-level concerns like sorting, selection, and potential diversity enforcement.
 
 ---
 
