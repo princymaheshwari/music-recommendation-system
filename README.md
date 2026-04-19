@@ -242,14 +242,11 @@ You will go deeper on this in your model card.
 
 ## Reflection
 
-Read and complete `model_card.md`:
+Read the full reflection in the [**Model Card**](model_card.md) (Section 9) and [**Reflection**](reflection.md).
 
-[**Model Card**](model_card.md)
+Building this recommender taught me that turning data into predictions is fundamentally an act of design, not discovery. Every decision — which features to include, how much weight each one carries, whether to use binary matching or proximity scoring — shapes what the system considers "similar." The scoring formula does not find objective truth about musical taste; it constructs a version of taste based on the dimensions it was told to measure. A user who cares about lyrics, cultural context, or nostalgia is invisible to this system because none of those things are in the data. Copilot helped me explore these tradeoffs quickly by generating scoring formulas, catalog expansions, and bias analyses, but I had to manually verify the math, catch inconsistent feature values, and test edge cases that Copilot did not anticipate on its own.
 
-Write 1 to 2 paragraphs here about what you learned:
-
-- about how recommenders turn data into predictions
-- about where bias or unfairness could show up in systems like this
+Bias and unfairness show up in subtle ways. The genre filter bubble is the most obvious — the system traps users in a single genre lane because binary matching makes it nearly impossible for a cross-genre song to compete. But the less obvious bias is in the data itself: eight genres have only one song, which means the system cannot meaningfully rank within those genres. A metal fan gets exactly one recommendation regardless of their numeric preferences. The "Gym Hero problem" revealed another form of unfairness — songs with extreme numeric features become chameleons that sneak into everyone's recommendations, crowding out more appropriate but numerically moderate songs. These biases are not bugs in the code; they are consequences of design choices that seemed reasonable in isolation but interact in unexpected ways at the system level.
 
 
 ---
