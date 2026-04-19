@@ -69,7 +69,7 @@ Genre is weighted highest because a genre mismatch is a dealbreaker — recommen
 
 ### How Songs Are Chosen
 
-The **ranking rule** orchestrates the scoring rule into a final recommendation list. It scores every song in the catalog against the user profile, sorts the results from highest to lowest score, and returns the top-k songs (default k=5). This two-step design — score individually, then rank collectively — keeps the scoring logic reusable and testable in isolation while allowing the ranking step to handle list-level concerns like sorting, selection, and potential diversity enforcement.
+The **ranking rule** orchestrates the scoring rule into a final recommendation list. It scores every song in the catalog against the user profile, sorts the results from highest to lowest score, and returns the top-k songs. This two-step design — score individually, then rank collectively — keeps the scoring logic reusable and testable in isolation while allowing the ranking step to handle list-level concerns like sorting, selection, and potential diversity enforcement.
 
 ### Data Flow Diagram
 
@@ -112,9 +112,9 @@ flowchart TD
         direction TB
         AllScores["Collect all 20\nscore + reason pairs"]
         SortDesc["Sort by score\nhighest to lowest"]
-        TopK["Select top-k\ndefault k = 5"]
+        TopK["Select top-k"]
         Explain["Attach explanation\nto each recommendation"]
-        FinalList["Final Output\nTop 5 songs with\nscores and reasons"]
+        FinalList["Final Output\nTop-k songs with\nscores and reasons"]
         AllScores --> SortDesc --> TopK --> Explain --> FinalList
     end
 
@@ -147,7 +147,7 @@ This system has several biases that are important to acknowledge upfront:
 
 **No concept of genre or mood similarity.** The system treats all genre mismatches as equally bad. "Indie pop" and "pop" get the same 0.0 genre score as "metal" and "pop," even though indie pop is clearly closer to pop than metal is. The same applies to mood: "happy" and "energetic" are treated as just as different as "happy" and "angry." A real recommender would use embeddings or similarity matrices to recognize that some categories are neighbors.
 
-**Filter bubble tendency.** Because the system rewards similarity on every dimension, it naturally clusters recommendations around a narrow sonic space. A user who likes happy pop will get five happy pop-adjacent songs and never discover that they might also love a chill jazz track with similar valence and danceability. There is no diversity mechanism to push the system toward variety.
+**Filter bubble tendency.** Because the system rewards similarity on every dimension, it naturally clusters recommendations around a narrow sonic space. A user who likes happy pop will get k happy pop-adjacent songs and never discover that they might also love a chill jazz track with similar valence and danceability. There is no diversity mechanism to push the system toward variety.
 
 **Static taste assumption.** The profile captures a single fixed snapshot of what the user wants. Real listeners change their preferences based on time of day, activity, season, and mood. A user might want chill lofi at midnight and intense rock at the gym, but our system can only serve one profile at a time.
 
