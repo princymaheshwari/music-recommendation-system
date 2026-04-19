@@ -123,6 +123,38 @@ flowchart TD
 
 **Reading the diagram:** Data flows top to bottom through three stages. The INPUT stage loads the song catalog and accepts user preferences. THE LOOP stage is where the scoring rule runs — it picks each song one at a time, computes similarity across all seven features, combines them into a weighted sum, and produces a score with reasons. Once every song has been scored, the OUTPUT stage collects all scores, sorts them from best to worst, slices the top-k, and attaches human-readable explanations to produce the final recommendation list.
 
+### Finalized Algorithm Recipe
+
+The complete scoring formula for a single song is:
+
+```
+score = 0.25 × genre_match
+      + 0.20 × mood_match
+      + 0.18 × (1 - |user_energy - song_energy|)
+      + 0.13 × acoustic_match
+      + 0.10 × (1 - |user_danceability - song_danceability|)
+      + 0.08 × (1 - |user_valence - song_valence|)
+      + 0.06 × (1 - |user_norm_tempo - song_norm_tempo|)
+```
+
+Where `genre_match` and `mood_match` are 1.0 for exact match or 0.0 otherwise, `acoustic_match` is the song's raw acousticness value if the user prefers acoustic music or `1 - acousticness` if they don't, and tempo is normalized to a 0–1 scale using `(bpm - 56) / (168 - 56)` based on the catalog's range. The ranking rule then sorts all scored songs descending and returns the top-k results with explanations.
+
+### Expected Biases and Known Trade-Offs
+
+This system has several biases that are important to acknowledge upfront:
+
+**Genre over-prioritization.** Genre carries the highest weight (0.25) and uses all-or-nothing binary matching. This means a song in the "wrong" genre starts with a 0.25-point penalty that the other five numeric features can never fully overcome. In practice, a mediocre genre match will always outrank an excellent cross-genre match. For example, a bland pop song that happens to share the user's preferred genre could score higher than an incredible indie pop song that perfectly matches the user's mood, energy, and danceability — simply because "indie pop" is not "pop." This is the single biggest bias in the system.
+
+**No concept of genre or mood similarity.** The system treats all genre mismatches as equally bad. "Indie pop" and "pop" get the same 0.0 genre score as "metal" and "pop," even though indie pop is clearly closer to pop than metal is. The same applies to mood: "happy" and "energetic" are treated as just as different as "happy" and "angry." A real recommender would use embeddings or similarity matrices to recognize that some categories are neighbors.
+
+**Filter bubble tendency.** Because the system rewards similarity on every dimension, it naturally clusters recommendations around a narrow sonic space. A user who likes happy pop will get five happy pop-adjacent songs and never discover that they might also love a chill jazz track with similar valence and danceability. There is no diversity mechanism to push the system toward variety.
+
+**Static taste assumption.** The profile captures a single fixed snapshot of what the user wants. Real listeners change their preferences based on time of day, activity, season, and mood. A user might want chill lofi at midnight and intense rock at the gym, but our system can only serve one profile at a time.
+
+**Acousticness is a blunt instrument.** It is the only feature scored as a boolean preference (likes acoustic vs. doesn't) rather than a numeric target. This means a user who mildly prefers acoustic music is treated identically to one who exclusively listens to unplugged sessions. Every other feature uses precise proximity scoring, but acousticness uses a binary toggle that loses nuance.
+
+**Small catalog bias.** With only 20 songs, some genres have just one representative (e.g., one metal song, one classical song). If the user prefers one of these sparse genres, the system has almost no ability to differentiate within that genre — the one matching song will always win, regardless of how well the numeric features align. A larger catalog would make the numeric features much more meaningful for ranking within a genre.
+
 ---
 
 ## Getting Started
