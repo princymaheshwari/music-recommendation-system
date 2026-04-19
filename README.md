@@ -102,7 +102,34 @@ The system supports **four interchangeable scoring strategies** using the Strate
 
 ### How Songs Are Chosen
 
-The **ranking rule** orchestrates the scoring rule into a final recommendation list. It scores every song in the catalog against the user profile, sorts the results from highest to lowest score, and returns the top-k songs. This two-step design — score individually, then rank collectively — keeps the scoring logic reusable and testable in isolation while allowing the ranking step to handle list-level concerns like sorting, selection, and potential diversity enforcement.
+The **ranking rule** orchestrates the scoring rule into a final recommendation list. It scores every song in the catalog against the user profile, sorts the results from highest to lowest score, and then applies a diversity filter before returning the top-k songs. This two-step design — score individually, then rank collectively — keeps the scoring logic reusable and testable in isolation while allowing the ranking step to handle list-level concerns like sorting, selection, and diversity enforcement.
+
+### Diversity Penalty (Fairness Logic)
+
+Without a diversity constraint, a lofi listener's top-5 could easily be three lofi songs from the same two artists. The system now applies a **greedy diversity penalty** during selection to prevent any single artist or genre from dominating the results.
+
+**How it works:** Instead of blindly taking the top-k scored songs, `recommend_songs` iterates through the sorted candidates one by one and checks what's already been selected:
+
+| Rule | Penalty | Hard Cap |
+|---|---|---|
+| **Artist repeat** | −0.15 per prior occurrence of the same artist | Max 2 songs per artist |
+| **Genre repeat** | −0.10 per prior occurrence of the same genre | Max 3 songs per genre |
+
+The penalties are cumulative. If an artist already has 1 song selected, their next song loses 0.15 points. If a genre already has 2 songs, the third loses 0.20 (0.10 × 2). Songs that hit the hard cap are skipped entirely — the system won't recommend a 3rd song from the same artist or a 4th from the same genre under any circumstances.
+
+**Example — Chill Lofi Listener (balanced strategy):**
+
+| Rank | Song | Artist | Raw Score | Penalty | Final Score |
+|---|---|---|---|---|---|
+| #1 | Midnight Coding | LoRoom | 0.9522 | — | 0.9522 |
+| #2 | Library Rain | Paper Lanterns | 0.9410 | genre x1: −0.10 | 0.8410 |
+| #3 | Focus Flow | LoRoom | 0.8182 | artist x1: −0.15, genre x2: −0.20 | 0.4682 |
+| #4 | Spacewalk Thoughts | Orbit Bloom | 0.7116 | — | 0.7116 |
+| #5 | Dream Cascade | Orbit Bloom | 0.5520 | genre x1: −0.10, artist x1: −0.15 | 0.3020 |
+
+Without the penalty, #4 and #5 would have been more lofi songs. With the penalty, the ambient tracks from Orbit Bloom get a fair chance, breaking the filter bubble.
+
+The diversity penalty can be disabled per call by passing `diversity=False` to `recommend_songs`, which gives the pure score-based ranking for comparison.
 
 ### Data Flow Diagram
 

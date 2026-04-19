@@ -89,6 +89,11 @@ TEMPO_MAX = 168
 POPULARITY_MAX = 100
 DECADE_OPTIONS = [1980, 1990, 2000, 2010, 2020]
 
+ARTIST_REPEAT_PENALTY = 0.15
+GENRE_REPEAT_PENALTY = 0.10
+MAX_SAME_ARTIST = 2
+MAX_SAME_GENRE = 3
+
 
 def load_songs(csv_path: str) -> List[Dict]:
     """Parse songs.csv into a list of dicts with numeric fields converted to int/float."""
@@ -194,17 +199,62 @@ def score_song(
     return (round(score, 4), reasons)
 
 def recommend_songs(
-    user_prefs: Dict, songs: List[Dict], k: int = 5, strategy: str = DEFAULT_STRATEGY
+    user_prefs: Dict,
+    songs: List[Dict],
+    k: int = 5,
+    strategy: str = DEFAULT_STRATEGY,
+    diversity: bool = True,
 ) -> List[Tuple[Dict, float, str]]:
-    """Score all songs with the chosen strategy, sort descending, return top-k."""
+    """Score all songs, apply optional diversity penalties, return top-k."""
     scored = [
         (song, *score_song(user_prefs, song, strategy=strategy))
         for song in songs
     ]
-
     ranked = sorted(scored, key=lambda item: item[1], reverse=True)
 
-    return [
-        (song, score, "; ".join(reasons))
-        for song, score, reasons in ranked[:k]
-    ]
+    if not diversity:
+        return [
+            (song, score, "; ".join(reasons))
+            for song, score, reasons in ranked[:k]
+        ]
+
+    selected: List[Tuple[Dict, float, str]] = []
+    artist_count: Dict[str, int] = {}
+    genre_count: Dict[str, int] = {}
+
+    for song, raw_score, reasons in ranked:
+        if len(selected) >= k:
+            break
+
+        artist = song["artist"]
+        genre = song["genre"]
+        penalty = 0.0
+        penalty_notes: List[str] = []
+
+        a_count = artist_count.get(artist, 0)
+        if a_count >= MAX_SAME_ARTIST:
+            continue
+        if a_count > 0:
+            artist_pen = ARTIST_REPEAT_PENALTY * a_count
+            penalty += artist_pen
+            penalty_notes.append(f"artist repeat x{a_count} (-{artist_pen:.2f})")
+
+        g_count = genre_count.get(genre, 0)
+        if g_count >= MAX_SAME_GENRE:
+            continue
+        if g_count > 0:
+            genre_pen = GENRE_REPEAT_PENALTY * g_count
+            penalty += genre_pen
+            penalty_notes.append(f"genre repeat x{g_count} (-{genre_pen:.2f})")
+
+        adjusted = round(max(0.0, raw_score - penalty), 4)
+
+        all_reasons = list(reasons)
+        if penalty_notes:
+            all_reasons.append("DIVERSITY: " + ", ".join(penalty_notes))
+
+        selected.append((song, adjusted, "; ".join(all_reasons)))
+        artist_count[artist] = a_count + 1
+        genre_count[genre] = g_count + 1
+
+    return selected

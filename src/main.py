@@ -145,7 +145,10 @@ def display_detailed(recommendations: list, strategy: str = "") -> None:
 
         reasons = explanation.split("; ")
         for reason in reasons:
-            print(f"         {reason}")
+            if reason.startswith("DIVERSITY:"):
+                print(f"       >>> {reason}")
+            else:
+                print(f"         {reason}")
 
     print(f"\n{SEPARATOR}")
 
